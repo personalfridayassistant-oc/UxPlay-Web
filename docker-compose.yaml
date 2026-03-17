@@ -17,3 +17,28 @@ services:
       - MDNS_ALLOW_INTERFACES=${MDNS_ALLOW_INTERFACES:-}
     devices:
       - /dev/dri:/dev/dri
+
+  caddy:
+    build:
+      context: .
+      dockerfile: Caddy.Dockerfile
+    container_name: uxplay-caddy
+    restart: unless-stopped
+    depends_on:
+      - uxplay-web
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN}
+      - DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

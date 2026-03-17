@@ -44,11 +44,25 @@ ENABLE_MDNS_REFLECTOR=true
 MDNS_ALLOW_INTERFACES=eth0,tailscale0
 ```
 
----
+### If you insist on proxying to `3001` (self-signed HTTPS upstream)
 
 ## docker-compose.yaml
 
 This repo now focuses only on `uxplay-web` service (no bundled Caddy). You can continue using your own external Caddy server separately.
+
+> Note: `tls_insecure_skip_verify` weakens security and should be avoided when possible. Port `3000` behind trusted LAN/VPN is usually cleaner.
+
+## ⚙️ Environment Variables
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `DOMAIN` | _required_ | Public domain served by Caddy (e.g., `yourname.duckdns.org`). |
+| `DUCKDNS_TOKEN` | _required_ | DuckDNS API token used by Caddy DNS-01 challenge. |
+| `AIRPLAY_NAME` | `UxPlay-Web` | Name shown in iOS/macOS Screen Mirroring list. |
+| `CUSTOM_PORT` | `3000` | Selkies HTTP port used by reverse proxy. |
+| `CUSTOM_HTTPS_PORT` | `3001` | Selkies self-signed HTTPS port for direct LAN fallback. |
+| `HARDEN_OPENBOX` | `true` | Selkies security setting. |
+| `HARDEN_DESKTOP` | `true` | Selkies security setting. |
 
 ---
 
