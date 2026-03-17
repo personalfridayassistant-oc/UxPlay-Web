@@ -1,98 +1,54 @@
 # UxPlay-Web
 
-A lightweight **AirPlay Mirroring server** running inside Docker. This project uses [UxPlay](https://github.com/FDH2/UxPlay) for AirPlay 1/2 and the [Selkies base image](https://github.com/linuxserver/docker-baseimage-selkies) for low-latency browser viewing.
+A lightweight **AirPlay Mirroring server** in Docker using [UxPlay](https://github.com/FDH2/UxPlay) + Selkies.
 
-> AirPlay discovery/casting still happens on your **local LAN** (mDNS). This repo now includes a Caddy reverse-proxy setup so the browser viewer can be reached securely from outside your network via a domain.
+## Important limitation (why your domain did not show up in AirPlay)
 
-## 🚀 Features
+AirPlay screen mirroring discovery uses **mDNS/Bonjour (link-local multicast)**. iPhone/iPad will not discover an AirPlay target by public DNS domain alone.
 
-- **AirPlay Mirroring:** Stream iPhone/iPad/Mac to UxPlay.
-- **Browser Viewing (LAN + WAN):**
-  - Local direct access: `https://<host-ip>:3001` (self-signed)
-  - Public access via Caddy + domain: `https://<your-domain>`
-- **Reverse-Proxy Ready:** Caddy config included with WebSocket-safe proxying to Selkies on port `3000`.
-- **Auto-Discovery:** Avahi/mDNS for seamless AirPlay device discovery.
+- ✅ Works on same LAN/VLAN
+- ❌ Does **not** work directly over the public internet/domain without additional network plumbing
+
+So: a reverse proxy/domain helps the **browser viewer**, but does not make iOS AirPlay discovery internet-native.
 
 ---
 
-## 🛠️ Prerequisites
+## What works for off-LAN AirPlay
 
-- Docker + Docker Compose plugin
-- A DNS record for your domain pointing to your public IP
-- DuckDNS domain (or compatible setup) and DuckDNS token for DNS-01 ACME validation
-- Router/NAT forwarding of port `443` to the Docker host (port `80` is optional with DNS challenge)
-- Host networking for UxPlay container (`network_mode: host`) so mDNS works reliably
+To mirror while away from home, your phone must effectively join your home network path (typically VPN), and mDNS must be reachable across that path.
+
+### Practical approach
+
+1. Keep this container on host networking.
+2. Connect phone + home network with VPN/subnet routing.
+3. Enable mDNS reflection in this container (new in this repo):
+   - `ENABLE_MDNS_REFLECTOR=true`
+   - `MDNS_ALLOW_INTERFACES=eth0,tailscale0` (example)
+
+> This does not guarantee every VPN/provider will pass AirPlay perfectly, but it is the correct direction for discovery across subnets.
 
 ---
 
-## ⚡ Quick Start (with Caddy)
-
-1. Create `.env` in project root:
-
-```dotenv
-DOMAIN=airplaytesla.duckdns.org
-DUCKDNS_TOKEN=your-duckdns-token
-AIRPLAY_NAME=UxPlay-Web
-```
-
-2. Start stack:
+## Quick Start
 
 ```bash
+docker build -t uxplay-web .
 docker compose up -d
 ```
 
-3. Access:
-   - External: `https://${DOMAIN}`
-   - Internal fallback: `https://<host-ip>:3001`
+Example `.env`:
 
-4. Start mirroring from iPhone/iPad on the same LAN as the host:
-   - Control Center → **Screen Mirroring** → select your `AIRPLAY_NAME`
-
----
-
-## 📁 Files Added for Reverse Proxy
-
-- `docker-compose.yaml` now includes a `caddy` service.
-- `Caddyfile` proxies domain traffic to `http://host.docker.internal:3000` and uses DuckDNS DNS-01 for TLS certificates.
-- `Caddy.Dockerfile` builds Caddy with the `duckdns` DNS provider module.
-
----
-
-
-## 🧭 Using an Existing Caddy on Another Machine
-
-Yes — you can keep Caddy on a separate machine and proxy to this host, **but use Selkies HTTP on port `3000`** (recommended), not the self-signed HTTPS endpoint on `3001` unless you really need it.
-
-### Recommended (upstream over HTTP)
-
-```caddy
-airplaytesla.duckdns.org {
-    reverse_proxy 192.168.1.65:3000
-}
-```
-
-If you also have a Tailscale/overlay path, use one upstream pool (failover/load-balance) instead of stacking two separate `reverse_proxy` directives:
-
-```caddy
-airplaytesla.duckdns.org {
-    reverse_proxy 192.168.1.65:3000 100.111.6.22:3000
-}
+```dotenv
+AIRPLAY_NAME=UxPlay-Web
+ENABLE_MDNS_REFLECTOR=true
+MDNS_ALLOW_INTERFACES=eth0,tailscale0
 ```
 
 ### If you insist on proxying to `3001` (self-signed HTTPS upstream)
 
-Your example is close, but should still be a single `reverse_proxy` block with both upstreams:
+## docker-compose.yaml
 
-```caddy
-airplaytesla.duckdns.org {
-    reverse_proxy 192.168.1.65:3001 100.111.6.22:3001 {
-        transport http {
-            tls
-            tls_insecure_skip_verify
-        }
-    }
-}
-```
+This repo now focuses only on `uxplay-web` service (no bundled Caddy). You can continue using your own external Caddy server separately.
 
 > Note: `tls_insecure_skip_verify` weakens security and should be avoided when possible. Port `3000` behind trusted LAN/VPN is usually cleaner.
 
@@ -110,37 +66,29 @@ airplaytesla.duckdns.org {
 
 ---
 
-## 🌐 Network Notes
+## Environment Variables
 
-### AirPlay (LAN-only control/data plane)
-
-These ports must be reachable on your local network:
-
-- UDP `5353` (mDNS)
-- TCP `7000`, `7001`, `7100`
-- UDP `5000-5005`
-
-### Remote browser viewing (WAN)
-
-- Public `443` → Caddy container (`80` optional)
-- Caddy obtains certs via DNS-01 (DuckDNS), avoiding HTTP-01 timeout issues
-- Caddy proxies to local Selkies HTTP endpoint (`3000`)
+| Variable | Default | Description |
+| --- | --- | --- |
+| `AIRPLAY_NAME` | `UxPlay-Web` | Name shown in iOS Screen Mirroring list. |
+| `CUSTOM_PORT` | `3000` | Selkies HTTP port (good for reverse proxy/browser access). |
+| `CUSTOM_HTTPS_PORT` | `3001` | Selkies self-signed HTTPS port. |
+| `ENABLE_MDNS_REFLECTOR` | `false` | Enables Avahi reflector for cross-interface mDNS relay. |
+| `MDNS_ALLOW_INTERFACES` | _(empty)_ | Optional comma-separated interface allow-list, e.g. `eth0,tailscale0`. |
 
 ---
 
-## 🔧 Troubleshooting
+## Network Ports (host network mode)
 
-- **Caddy exits on startup with `unsupported HTTP version: h1`:** remove custom transport version overrides and use the provided `Caddyfile` (Caddy expects `1.1`, `2`, `h2c`, or `3`).
-- **`ERR_SSL_PROTOCOL_ERROR` with ACME `Timeout during connect`:** this is usually HTTP-01 validation failing because inbound port `80` is blocked. Use DNS-01 with `DUCKDNS_TOKEN` (configured by default in this repo) and ensure your domain resolves to your public IP.
-- **Can open domain but no stream appears:** verify Caddy can reach host gateway (`host.docker.internal`) and that `uxplay-web` is running.
-- **AirPlay device not found on iPhone:** iPhone and host must be on same broadcast domain/VLAN; mDNS does not traverse internet.
-- **High CPU / stuttering:** pass `/dev/dri` for GPU acceleration.
+- UDP `5353` mDNS (discovery)
+- TCP `7000`, `7001`, `7100` AirPlay control/media
+- UDP `5000-5005` media streams
+- TCP `3000`/`3001` browser viewing endpoints
 
 ---
 
-## 📜 Credits
+## Troubleshooting
 
-- [UxPlay](https://github.com/FDH2/UxPlay)
-- [LinuxServer Selkies base image](https://github.com/linuxserver/docker-baseimage-selkies)
-- [GStreamer](https://gstreamer.freedesktop.org/)
-- [Avahi](https://www.avahi.org/)
+- **AirPlay works on LAN but not off-LAN:** expected unless VPN + mDNS relay/reflector are in place.
+- **Domain works in browser but not in iOS Screen Mirroring list:** expected; AirPlay discovery is not domain-based.
+- **High CPU/stutter:** map `/dev/dri` for GPU acceleration.
