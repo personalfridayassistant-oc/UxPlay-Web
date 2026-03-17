@@ -58,6 +58,44 @@ docker compose up -d
 
 ---
 
+
+## 🧭 Using an Existing Caddy on Another Machine
+
+Yes — you can keep Caddy on a separate machine and proxy to this host, **but use Selkies HTTP on port `3000`** (recommended), not the self-signed HTTPS endpoint on `3001` unless you really need it.
+
+### Recommended (upstream over HTTP)
+
+```caddy
+airplaytesla.duckdns.org {
+    reverse_proxy 192.168.1.65:3000
+}
+```
+
+If you also have a Tailscale/overlay path, use one upstream pool (failover/load-balance) instead of stacking two separate `reverse_proxy` directives:
+
+```caddy
+airplaytesla.duckdns.org {
+    reverse_proxy 192.168.1.65:3000 100.111.6.22:3000
+}
+```
+
+### If you insist on proxying to `3001` (self-signed HTTPS upstream)
+
+Your example is close, but should still be a single `reverse_proxy` block with both upstreams:
+
+```caddy
+airplaytesla.duckdns.org {
+    reverse_proxy 192.168.1.65:3001 100.111.6.22:3001 {
+        transport http {
+            tls
+            tls_insecure_skip_verify
+        }
+    }
+}
+```
+
+> Note: `tls_insecure_skip_verify` weakens security and should be avoided when possible. Port `3000` behind trusted LAN/VPN is usually cleaner.
+
 ## ⚙️ Environment Variables
 
 | Variable | Default | Description |
