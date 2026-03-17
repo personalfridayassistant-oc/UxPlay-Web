@@ -1,0 +1,19 @@
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Forward browser traffic to Selkies HTTP endpoint on the Docker host.
+	reverse_proxy http://host.docker.internal:3000
+
+	# Use DNS-01 challenge via DuckDNS so certificate issuance works even when
+	# inbound port 80 is blocked or unreachable from Let's Encrypt.
+	tls {
+		dns duckdns {$DUCKDNS_TOKEN}
+	}
+
+	# Tighten defaults while still allowing the app to function.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
