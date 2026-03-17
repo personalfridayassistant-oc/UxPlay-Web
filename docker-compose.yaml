@@ -5,9 +5,35 @@ services:
     network_mode: host
     restart: unless-stopped
     environment:
-        - PUID=1000
-        - PGID=1000
-        - TZ=Europe/Berlin
-        - AIRPLAY_NAME=uxplay-web
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
+      - AIRPLAY_NAME=${AIRPLAY_NAME:-UxPlay-Web}
+      # Keep Selkies HTTP enabled for reverse proxying.
+      - CUSTOM_PORT=3000
+      # Optional direct HTTPS endpoint (self-signed). Leave enabled for LAN fallback.
+      - CUSTOM_HTTPS_PORT=3001
     devices:
       - /dev/dri:/dev/dri
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: uxplay-caddy
+    restart: unless-stopped
+    depends_on:
+      - uxplay-web
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

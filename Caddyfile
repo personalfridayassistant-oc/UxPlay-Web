@@ -1,0 +1,15 @@
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Forward browser traffic to Selkies HTTP endpoint on the Docker host.
+	# Caddy's default reverse_proxy behavior already handles WebSocket upgrades
+	# and forwards X-Forwarded-* headers.
+	reverse_proxy http://host.docker.internal:3000
+
+	# Tighten defaults while still allowing the app to function.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
