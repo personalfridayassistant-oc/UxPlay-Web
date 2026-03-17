@@ -5,9 +5,15 @@ services:
     network_mode: host
     restart: unless-stopped
     environment:
-        - PUID=1000
-        - PGID=1000
-        - TZ=Europe/Berlin
-        - AIRPLAY_NAME=uxplay-web
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
+      - AIRPLAY_NAME=${AIRPLAY_NAME:-UxPlay-Web}
+      - CUSTOM_PORT=3000
+      - CUSTOM_HTTPS_PORT=3001
+      # Optional: reflect mDNS across interfaces (useful with VPN/subnet routing).
+      - ENABLE_MDNS_REFLECTOR=${ENABLE_MDNS_REFLECTOR:-false}
+      # Optional: comma-separated interface list for Avahi, e.g. eth0,tailscale0
+      - MDNS_ALLOW_INTERFACES=${MDNS_ALLOW_INTERFACES:-}
     devices:
       - /dev/dri:/dev/dri
