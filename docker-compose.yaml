@@ -17,7 +17,9 @@ services:
       - /dev/dri:/dev/dri
 
   caddy:
-    image: caddy:2-alpine
+    build:
+      context: .
+      dockerfile: Caddy.Dockerfile
     container_name: uxplay-caddy
     restart: unless-stopped
     depends_on:
@@ -27,6 +29,7 @@ services:
       - "443:443"
     environment:
       - DOMAIN=${DOMAIN}
+      - DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

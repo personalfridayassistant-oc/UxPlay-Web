@@ -19,7 +19,8 @@ A lightweight **AirPlay Mirroring server** running inside Docker. This project u
 
 - Docker + Docker Compose plugin
 - A DNS record for your domain pointing to your public IP
-- Router/NAT forwarding of ports `80` and `443` to the Docker host (for Caddy)
+- DuckDNS domain (or compatible setup) and DuckDNS token for DNS-01 ACME validation
+- Router/NAT forwarding of port `443` to the Docker host (port `80` is optional with DNS challenge)
 - Host networking for UxPlay container (`network_mode: host`) so mDNS works reliably
 
 ---
@@ -29,7 +30,8 @@ A lightweight **AirPlay Mirroring server** running inside Docker. This project u
 1. Create `.env` in project root:
 
 ```dotenv
-DOMAIN=airplay.example.com
+DOMAIN=airplaytesla.duckdns.org
+DUCKDNS_TOKEN=your-duckdns-token
 AIRPLAY_NAME=UxPlay-Web
 ```
 
@@ -51,7 +53,8 @@ docker compose up -d
 ## 📁 Files Added for Reverse Proxy
 
 - `docker-compose.yaml` now includes a `caddy` service.
-- `Caddyfile` proxies domain traffic to `http://host.docker.internal:3000` (Selkies HTTP endpoint).
+- `Caddyfile` proxies domain traffic to `http://host.docker.internal:3000` and uses DuckDNS DNS-01 for TLS certificates.
+- `Caddy.Dockerfile` builds Caddy with the `duckdns` DNS provider module.
 
 ---
 
@@ -59,6 +62,8 @@ docker compose up -d
 
 | Variable | Default | Description |
 | --- | --- | --- |
+| `DOMAIN` | _required_ | Public domain served by Caddy (e.g., `yourname.duckdns.org`). |
+| `DUCKDNS_TOKEN` | _required_ | DuckDNS API token used by Caddy DNS-01 challenge. |
 | `AIRPLAY_NAME` | `UxPlay-Web` | Name shown in iOS/macOS Screen Mirroring list. |
 | `CUSTOM_PORT` | `3000` | Selkies HTTP port used by reverse proxy. |
 | `CUSTOM_HTTPS_PORT` | `3001` | Selkies self-signed HTTPS port for direct LAN fallback. |
@@ -79,7 +84,8 @@ These ports must be reachable on your local network:
 
 ### Remote browser viewing (WAN)
 
-- Public `80/443` → Caddy container
+- Public `443` → Caddy container (`80` optional)
+- Caddy obtains certs via DNS-01 (DuckDNS), avoiding HTTP-01 timeout issues
 - Caddy proxies to local Selkies HTTP endpoint (`3000`)
 
 ---
@@ -87,6 +93,7 @@ These ports must be reachable on your local network:
 ## 🔧 Troubleshooting
 
 - **Caddy exits on startup with `unsupported HTTP version: h1`:** remove custom transport version overrides and use the provided `Caddyfile` (Caddy expects `1.1`, `2`, `h2c`, or `3`).
+- **`ERR_SSL_PROTOCOL_ERROR` with ACME `Timeout during connect`:** this is usually HTTP-01 validation failing because inbound port `80` is blocked. Use DNS-01 with `DUCKDNS_TOKEN` (configured by default in this repo) and ensure your domain resolves to your public IP.
 - **Can open domain but no stream appears:** verify Caddy can reach host gateway (`host.docker.internal`) and that `uxplay-web` is running.
 - **AirPlay device not found on iPhone:** iPhone and host must be on same broadcast domain/VLAN; mDNS does not traverse internet.
 - **High CPU / stuttering:** pass `/dev/dri` for GPU acceleration.
