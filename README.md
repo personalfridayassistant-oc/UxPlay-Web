@@ -86,6 +86,7 @@ These ports must be reachable on your local network:
 
 ## 🔧 Troubleshooting
 
+- **Caddy exits on startup with `unsupported HTTP version: h1`:** remove custom transport version overrides and use the provided `Caddyfile` (Caddy expects `1.1`, `2`, `h2c`, or `3`).
 - **Can open domain but no stream appears:** verify Caddy can reach host gateway (`host.docker.internal`) and that `uxplay-web` is running.
 - **AirPlay device not found on iPhone:** iPhone and host must be on same broadcast domain/VLAN; mDNS does not traverse internet.
 - **High CPU / stuttering:** pass `/dev/dri` for GPU acceleration.
